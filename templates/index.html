@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punjabi Text Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #009688;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h1 class="text-3xl font-bold text-center text-teal-700 mb-8">Punjabi Text Converter</h1>
+            <form class="space-y-6" action="/convert" method="post" enctype="multipart/form-data">
+                <div class="border-2 border-dashed border-teal-200 rounded-xl p-8 text-center cursor-pointer hover:border-teal-400 transition-colors bg-gray-50" onclick="document.getElementById('file').click()">
+                    <input type="file" id="file" name="file" accept=".docx" class="hidden" onchange="updateFileName()">
+                    <p id="file-name" class="text-gray-600">Click to select a Word document (.docx)</p>
+                </div>
+                <button type="submit" id="submit-btn" disabled class="w-full bg-gradient-to-r from-teal-500 to-teal-600 text-white py-3 px-6 rounded-lg font-semibold shadow-md hover:from-teal-600 hover:to-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    Convert to PDF
+                </button>
+            </form>
+            <div id="status" class="mt-4 text-center text-gray-600"></div>
+            <div id="spinner" class="spinner mx-auto mt-4 hidden"></div>
+            <div id="error-message" class="mt-4 text-center text-red-600 font-medium hidden"></div>
+        </div>
+
+        <div id="preview-section" class="bg-white rounded-2xl shadow-xl p-8 hidden">
+            <h2 class="text-xl font-semibold text-teal-700 mb-4 text-center">PDF Preview</h2>
+            <iframe id="pdf-frame" class="w-full h-[500px] border border-teal-200 rounded-lg shadow-sm hidden"></iframe>
+            <a id="download-btn" href="#" download class="mt-4 block w-auto bg-gradient-to-r from-teal-500 to-teal-600 text-white py-3 px-6 rounded-lg font-semibold shadow-md hover:from-teal-600 hover:to-teal-700 transition-all text-center mx-auto">
+                Download PDF
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function updateFileName() {
+            const fileInput = document.getElementById('file');
+            const fileName = document.getElementById('file-name');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            if (fileInput.files.length > 0) {
+                fileName.textContent = fileInput.files[0].name;
+                submitBtn.disabled = false;
+            } else {
+                fileName.textContent = 'Click to select a Word document (.docx)';
+                submitBtn.disabled = true;
+            }
+        }
+
+        document.querySelector('form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const status = document.getElementById('status');
+            const spinner = document.getElementById('spinner');
+            const errorMessage = document.getElementById('error-message');
+            const pdfFrame = document.getElementById('pdf-frame');
+            const downloadBtn = document.getElementById('download-btn');
+            const previewSection = document.getElementById('preview-section');
+            
+            status.textContent = 'Converting... Please wait.';
+            spinner.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            pdfFrame.classList.add('hidden');
+            downloadBtn.classList.add('hidden');
+            previewSection.classList.add('hidden');
+            
+            const formData = new FormData(this);
+            fetch('/convert', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Conversion failed');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                pdfFrame.src = url;
+                pdfFrame.classList.remove('hidden');
+                downloadBtn.href = url;
+                downloadBtn.classList.remove('hidden');
+                previewSection.classList.remove('hidden');
+                status.textContent = 'Conversion complete!';
+            })
+            .catch(error => {
+                errorMessage.textContent = 'Error: ' + error.message;
+                errorMessage.classList.remove('hidden');
+                status.textContent = '';
+            })
+            .finally(() => {
+                spinner.classList.add('hidden');
+            });
+        });
+    </script>
+</body>
+</html> 
