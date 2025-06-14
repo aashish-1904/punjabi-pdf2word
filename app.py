@@ -1,47 +1,77 @@
-from flask import Flask, request, render_template, send_file, flash, redirect, url_for
+import streamlit as st
 import os
-from werkzeug.utils import secure_filename
+from docx2pdf import convert
 import tempfile
-from docx2pdf import convert as docx2pdf_convert
+from pathlib import Path
 
-app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # Needed for flashing messages
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
+# Set page config
+st.set_page_config(
+    page_title="Punjabi Text Converter",
+    page_icon="📄",
+    layout="centered"
+)
 
-ALLOWED_EXTENSIONS = {'docx'}
+# Custom CSS
+st.markdown("""
+    <style>
+    .stButton>button {
+        background: linear-gradient(90deg, #009688 60%, #4dd0e1 100%);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(90deg, #00796b 60%, #26c6da 100%);
+    }
+    .main {
+        background: linear-gradient(120deg, #f5f5f5 60%, #e0f7fa 100%);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# Title
+st.title("Punjabi Text Converter")
+st.markdown("Convert your Word documents to PDF while preserving Punjabi text formatting")
 
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html')
+# File uploader
+uploaded_file = st.file_uploader("Choose a Word document", type=['docx'])
 
-@app.route('/convert', methods=['POST'])
-def convert():
-    if 'file' not in request.files:
-        return 'No file uploaded', 400
-    file = request.files['file']
-    if file.filename == '':
-        return 'No file selected', 400
-    if file and allowed_file(file.filename):
-        docx_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
-        file.save(docx_path)
-        pdf_filename = secure_filename(file.filename.rsplit('.', 1)[0] + '.pdf')
-        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+if uploaded_file is not None:
+    # Create a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Save the uploaded file
+        docx_path = os.path.join(temp_dir, uploaded_file.name)
+        with open(docx_path, 'wb') as f:
+            f.write(uploaded_file.getvalue())
+        
+        # Convert to PDF
+        pdf_filename = Path(uploaded_file.name).stem + '.pdf'
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+        
         try:
-            docx2pdf_convert(docx_path, pdf_path)
+            with st.spinner('Converting... Please wait.'):
+                convert(docx_path, pdf_path)
+            
+            # Read the PDF file
+            with open(pdf_path, 'rb') as f:
+                pdf_bytes = f.read()
+            
+            # Show success message
+            st.success('Conversion complete!')
+            
+            # Display PDF preview
+            st.markdown("### PDF Preview")
+            st.components.v1.iframe(pdf_bytes, height=500)
+            
+            # Download button
+            st.download_button(
+                label="Download PDF",
+                data=pdf_bytes,
+                file_name=pdf_filename,
+                mime="application/pdf"
+            )
+            
         except Exception as e:
-            if os.path.exists(docx_path):
-                os.remove(docx_path)
-            return f'Conversion failed: {str(e)}', 500
-        if os.path.exists(docx_path):
-            os.remove(docx_path)
-        if not os.path.exists(pdf_path):
-            return 'PDF not created', 500
-        return send_file(pdf_path, as_attachment=True, download_name=pdf_filename)
-    return 'Invalid file type', 400
-
-if __name__ == '__main__':
-    app.run(debug=True) 
+            st.error(f'Error during conversion: {str(e)}') 
